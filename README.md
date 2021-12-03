@@ -4,7 +4,7 @@
 ## About
 Surge is a chemical structure generator based on the Nauty package and thereby on the principles of canonical augmentation.
 More precisely, Surge generates all non-isomorphic constitutional isomers of a given molecular formula.
-See the [**user manual**](https://github.com/steinbeck/Surge/blob/main/doc/surge1_0.pdf) for more information. 
+See the [**user manual**](https://github.com/StructureGenerator/SURGE/blob/main/doc/surge1_0.pdf) for more information. 
 
 ## Usage
 Surge is a command line tool. Running `surge -u C10H16O` will generate the 452458 isomers of C<sub>10</sub>H<sub>16</sub>O in 0.1s on some vanilla flavor year-2021 PC. Running `surge -S C10H16O` outputs those structurs in SMILES format. You can either use `surge -S C10H16O > myresults.smi` to redirect the output into a result file, or use the `-o`switch to provide a filename. Further formats supported are SD Files (SDF) and a concise Surge-specific format.  
@@ -66,9 +66,9 @@ Download one of the releases on this GitHub page and run it.
 
 ### Option 2: Build from source code
 1. Download the latest Nauty release from http://users.cecs.anu.edu.au/~bdm/nauty/ and build it following the instrucations on the page.
-2. Download surge.c from the [source releases on this GitHub page](https://github.com/steinbeck/Surge/releases) and put it into the nauty folder
+2. Download surge.c from the [source releases on this GitHub page](https://github.com/StructureGenerator/SURGE/releases) and put it into the nauty folder
 3. Compile using the instructions at the beginning of surge.c. The following works on Linux, MacOS as well as with the https://MSYS2.org
-Software Distribution and Building Platform for Windows. The latter was used to build the Windows release of Surge available on the [release page](https://github.com/steinbeck/Surge/releases) .
+Software Distribution and Building Platform for Windows. The latter was used to build the Windows release of Surge available on the [release page](https://github.com/StructureGenerator/SURGE/releases) .
 ```
 gcc -o surge -O3 -DWORDSIZE=32 -DMAXN=WORDSIZE -DOUTPROC=surgeproc \
          -march=native -mtune=native -DPREPRUNE=surgepreprune \
