@@ -1,4 +1,4 @@
-<img src="resources/logo2.png" alt="drawing" width="100" align = "right"/>
+<img src="resources/Ulogo.png" alt="drawing" width="100" align = "right"/>
 
 # Surge: A Fast Open-Source Chemical Graph Generator
 ## About
