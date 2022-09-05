@@ -62,7 +62,7 @@ formula = a formula like C8H6N2
 ```
 ## Installation
 ### Option 1: Binary releases
-Download one of the releases on this GitHub page and run it.
+Download one of the [releases](https://github.com/StructureGenerator/SURGE/releases) and run it.
 
 ### Option 2: Build from source code
 1. Download the latest Nauty release from http://users.cecs.anu.edu.au/~bdm/nauty/ and build it following the instrucations on the page.
