@@ -12,6 +12,7 @@ authors:
   orcid: "https://orcid.org/0000-0001-6966-0814"
 title: "surge"
 version: 1.0
+doi: - 
 date-released: 2021-12-02
 url: "https://github.com/StructureGenerator/surge"
 preferred-citation:
