@@ -64,7 +64,7 @@ formula = a formula like C8H6N2
 Download one of the [releases](https://github.com/StructureGenerator/SURGE/releases) and run it.
 
 ### Option 2: Build from source code
-1. Download the latest Nauty release from http://users.cecs.anu.edu.au/~bdm/nauty/ and build it following the instrucations on the page.
+1. Download the latest Nauty release from http://users.cecs.anu.edu.au/~bdm/nauty/ and build it following the instructions on the page.
 2. Download surge.c from the [source releases on this GitHub page](https://github.com/StructureGenerator/SURGE/releases) and put it into the nauty folder
 3. Compile using the instructions at the beginning of surge.c. The following works on Linux, MacOS as well as with the https://MSYS2.org
 Software Distribution and Building Platform for Windows. The latter was used to build the Windows release of Surge available on the [release page](https://github.com/StructureGenerator/SURGE/releases) .
@@ -96,3 +96,4 @@ docker run --rm -it surge:latest surge
 
 ## Misc
 Surge was developed by [Brendan McKay](http://users.cecs.anu.edu.au/~bdm) with the help of [Christoph Steinbeck](https://github.com/steinbeck) and [Mehmet Aziz Yirik](https://github.com/mehmetazizyirik).
+
