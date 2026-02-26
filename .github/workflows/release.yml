@@ -57,8 +57,8 @@ jobs:
       - name: Build nauty from source (Linux/Windows)
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'windows-latest'
         run: |
-          curl -L -o nauty29r3.tar.gz https://users.cecs.anu.edu.au/~bdm/nauty/nauty29r3.tar.gz
-          tar xzf nauty29r3.tar.gz
+          curl -L -o nauty2_9_3.tar.gz https://users.cecs.anu.edu.au/~bdm/nauty/nauty2_9_3.tar.gz
+          tar xzf nauty2_9_3.tar.gz
           cd nauty2_9_3
           ./configure && make
 

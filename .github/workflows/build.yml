@@ -19,8 +19,8 @@ jobs:
 
       - name: Build nauty
         run: |
-          curl -L -o nauty29r3.tar.gz https://users.cecs.anu.edu.au/~bdm/nauty/nauty29r3.tar.gz
-          tar xzf nauty29r3.tar.gz
+          curl -L -o nauty2_9_3.tar.gz https://users.cecs.anu.edu.au/~bdm/nauty/nauty2_9_3.tar.gz
+          tar xzf nauty2_9_3.tar.gz
           cd nauty2_9_3
           ./configure && make
 
@@ -114,8 +114,8 @@ jobs:
 
       - name: Build nauty
         run: |
-          curl -L -o nauty29r3.tar.gz https://users.cecs.anu.edu.au/~bdm/nauty/nauty29r3.tar.gz
-          tar xzf nauty29r3.tar.gz
+          curl -L -o nauty2_9_3.tar.gz https://users.cecs.anu.edu.au/~bdm/nauty/nauty2_9_3.tar.gz
+          tar xzf nauty2_9_3.tar.gz
           cd nauty2_9_3
           ./configure && make
 
@@ -132,6 +132,7 @@ jobs:
         run: |
           ./surge.exe -help 2>&1 | head -3
           ./surge.exe -u C6H6
+          ./surge.exe -u C4H10
 
       - name: Upload Windows binary
         uses: actions/upload-artifact@v4

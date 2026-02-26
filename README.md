@@ -84,22 +84,24 @@ make surge NAUTY=/path/to/nauty NAUTYLIB=/path/to/nauty
 ```
 Or compile directly with gcc:
 ```
-gcc -o surge -O3 -DWORDSIZE=64 -DMAXN=WORDSIZE -DOUTPROC=surgeproc \
-         -march=native -DPREPRUNE=surgepreprune \
+gcc -o surge -O3 -I /path/to/nauty -DWORDSIZE=64 -DMAXN=WORDSIZE \
+         -DOUTPROC=surgeproc -march=native -DPREPRUNE=surgepreprune \
          -DPRUNE=surgeprune -DGENG_MAIN=geng_main \
          surge.c geng.c planarity.c /path/to/nautyL1.a
 ```
 You can build-in gzip output using the zlib library (https://zlib.net). Add `-DZLIB` to the compilation, and link with the zlib library either by adding `-lz` or `libz.a`. This will activate the `-z` command to gzip the output:
 ```
-gcc -o surge -O3 -DWORDSIZE=64 -DMAXN=WORDSIZE -DOUTPROC=surgeproc \
-         -march=native -DPREPRUNE=surgepreprune -DZLIB \
-         -DPRUNE=surgeprune -DGENG_MAIN=geng_main \
+gcc -o surge -O3 -I /path/to/nauty -DWORDSIZE=64 -DMAXN=WORDSIZE \
+         -DOUTPROC=surgeproc -march=native -DPREPRUNE=surgepreprune \
+         -DZLIB -DPRUNE=surgeprune -DGENG_MAIN=geng_main \
          surge.c geng.c planarity.c /path/to/nautyL1.a -lz
 ```
 
 **Note for macOS Homebrew users:** If you installed nauty via Homebrew (`brew install nauty`), the library file may be named `libnautyL1.a` rather than `nautyL1.a`. You can create a symlink to make it work with the Makefile:
 ```
-ln -s /opt/homebrew/lib/libnautyL1.a /opt/homebrew/lib/nautyL1.a
+NAUTY_LIB=$(brew --prefix nauty)/lib
+ln -s "$NAUTY_LIB/libnautyL1.a" "$NAUTY_LIB/nautyL1.a"
+make surge NAUTY=$(brew --prefix nauty)/include/nauty NAUTYLIB=$(brew --prefix nauty)/lib
 ```
 
 ### Option 3: Use Docker

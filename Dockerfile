@@ -8,8 +8,8 @@ RUN apt-get update && \
 WORKDIR /build
 
 # Download and build nauty
-RUN curl -L -o nauty29r3.tar.gz https://users.cecs.anu.edu.au/~bdm/nauty/nauty29r3.tar.gz \
-    && tar xzf nauty29r3.tar.gz \
+RUN curl -L -o nauty2_9_3.tar.gz https://users.cecs.anu.edu.au/~bdm/nauty/nauty2_9_3.tar.gz \
+    && tar xzf nauty2_9_3.tar.gz \
     && cd nauty2_9_3 \
     && ./configure && make
 
