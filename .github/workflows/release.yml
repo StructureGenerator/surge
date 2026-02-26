@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-release:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: surge-linux-x86_64
+            binary: surge
+          - os: macos-13
+            artifact: surge-macos-x86_64
+            binary: surge
+          - os: macos-14
+            artifact: surge-macos-arm64
+            binary: surge
+          - os: windows-latest
+            artifact: surge-windows-x86_64
+            binary: surge.exe
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSYS2 (Windows only)
+        if: matrix.os == 'windows-latest'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            make
+            mingw-w64-ucrt-x86_64-zlib
+            curl
+            tar
+
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc make zlib1g-dev
+
+      - name: Install nauty (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          brew install nauty
+          NAUTY_LIB=$(brew --prefix nauty)/lib
+          ln -sf "$NAUTY_LIB/libnautyL1.a" "$NAUTY_LIB/nautyL1.a"
+
+      - name: Build nauty from source (Linux/Windows)
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'windows-latest'
+        run: |
+          curl -L -o nauty29r3.tar.gz https://users.cecs.anu.edu.au/~bdm/nauty/nauty29r3.tar.gz
+          tar xzf nauty29r3.tar.gz
+          cd nauty2_9_3
+          ./configure && make
+
+      - name: Build surge (Linux/Windows)
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'windows-latest'
+        working-directory: src
+        run: |
+          make surge \
+            NAUTY=$(cygpath -u "$GITHUB_WORKSPACE" 2>/dev/null || echo "$GITHUB_WORKSPACE")/nauty2_9_3 \
+            NAUTYLIB=$(cygpath -u "$GITHUB_WORKSPACE" 2>/dev/null || echo "$GITHUB_WORKSPACE")/nauty2_9_3 \
+            CCOPT="-O3"
+
+      - name: Build surge (macOS)
+        if: startsWith(matrix.os, 'macos')
+        working-directory: src
+        run: |
+          make surge \
+            NAUTY=$(brew --prefix nauty)/include/nauty \
+            NAUTYLIB=$(brew --prefix nauty)/lib \
+            CCOPT="-O3"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: src/${{ matrix.binary }}
+
+  create-release:
+    needs: build-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Package binaries
+        run: |
+          cd artifacts
+          for dir in */; do
+            name="${dir%/}"
+            cd "$name"
+            chmod +x * 2>/dev/null || true
+            tar czf "../${name}.tar.gz" *
+            cd ..
+          done
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Surge ${{ github.ref_name }}"
+          draft: true
+          generate_release_notes: false
+          body: |
+            ## Surge 2.0
+
+            A fast open-source chemical graph generator.
+
+            ### What's New in 2.0
+            - **64-bit word size**: Supports larger molecular structures
+            - **Aromaticity detection** (`-R`): Filter duplicate Kekule structures under carbon-ring aromaticity
+            - **Hexagon restrictions** (`-h#`, `-h#:#`): Control 6-membered cycle counts
+            - **Carbon 6-ring restrictions** (`-C#`, `-C#:#`): Limit carbon-only 6-membered rings
+            - **Improved summary reporting**
+
+            ### Installation
+            Download the binary for your platform below, or build from source (see README).
+
+            ### Binaries
+            - `surge-linux-x86_64.tar.gz` - Linux (x86_64)
+            - `surge-macos-x86_64.tar.gz` - macOS (Intel)
+            - `surge-macos-arm64.tar.gz` - macOS (Apple Silicon)
+            - `surge-windows-x86_64.tar.gz` - Windows (x86_64, built with MSYS2)
+          files: |
+            artifacts/*.tar.gz
+            doc/surge2_0.pdf
