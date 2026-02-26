@@ -19,10 +19,6 @@ For large sets of structures, the -z option for compressing the output in gzip f
 
 `surge -help` will show all options:
 
-<p align="center">
-  <img src="resources/logo.png" alt="drawing" width="400"
-</p>
-
 ```
 Usage: ./surge [-oFILE] [-z] [-A|-S|-F] [-T] [-e#|-e#:#] [-R] [-d#] [-c#] [-m#/#] formula
 
@@ -124,3 +120,4 @@ docker run --rm surge:latest -S C10H16O > results.smi
 
 ## Misc
 Surge was developed by [Brendan McKay](http://users.cecs.anu.edu.au/~bdm) with the help of [Christoph Steinbeck](https://github.com/steinbeck) and [Mehmet Aziz Yirik](https://github.com/mehmetazizyirik).
+
