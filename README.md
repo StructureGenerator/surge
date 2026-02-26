@@ -24,7 +24,7 @@ For large sets of structures, the -z option for compressing the output in gzip f
 </p>
 
 ```
-Usage: surge [-oFILE] [-z] [-A|-S|-F] [-T] [-e#|-e#:#] [-R] [-d#] [-c#] [-m#/#] formula
+Usage: ./surge [-oFILE] [-z] [-A|-S|-F] [-T] [-e#|-e#:#] [-R] [-d#] [-c#] [-m#/#] formula
 
 Make chemical graphs from a formula. Version 2.0.
   Known elements are C,B,N,P,O,S,H,Cl,F,Br,I at their lowest valences.
