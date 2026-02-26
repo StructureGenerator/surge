@@ -53,3 +53,8 @@ dkms.conf
 
 # Editor backup files
 *~
+
+# Surge binaries
+surge
+surge_[0-9]
+canonsdf

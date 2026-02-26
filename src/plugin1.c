@@ -1,17 +1,17 @@
 /* This is a plugin for surge that implements an extra option
-   -F# or -F#:# for the number of atoms with exactly 4 distinct
+   -V# or -V#:# for the number of atoms with exactly 4 distinct
    non-H neighbours. */
 
 #define HELPTEXT2 \
-" -F# -F#:# Specify number of atoms with exactly 4 non-H neighbours\n"
+" -V# -V#:# Specify number of atoms with exactly 4 non-H neighbours\n"
 
-static boolean Fswitch = FALSE;
-static long Fmin,Fmax;
+static boolean Vswitch = FALSE;
+static long Vmin,Vmax;
 
 #define SURGEPLUGIN_STEP1 \
- { int ii,Fval; Fval=0; \
-   for (ii = 0; ii < n; ++ii) if (deg[ii] == 4) ++Fval; \
-   if (Fswitch && (Fval < Fmin || Fval > Fmax)) return; }
+ { int ii,Vval; Vval=0; \
+   for (ii = 0; ii < n; ++ii) if (deg[ii] == 4) ++Vval; \
+   if (Vswitch && (Vval < Vmin || Vval > Vmax)) return; }
 
 #define SURGEPLUGIN_SWITCHES \
-  SWRANGE('F',":-",Fswitch,Fmin,Fmax,"surge -F")
+  SWRANGE('V',":-",Vswitch,Vmin,Vmax,"surge -V")

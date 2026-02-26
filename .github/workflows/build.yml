@@ -1,0 +1,141 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, 'release/**' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc make zlib1g-dev
+
+      - name: Build nauty
+        run: |
+          curl -L -o nauty2_9_3.tar.gz https://users.cecs.anu.edu.au/~bdm/nauty/nauty2_9_3.tar.gz
+          tar xzf nauty2_9_3.tar.gz
+          cd nauty2_9_3
+          ./configure && make
+
+      - name: Build surge
+        working-directory: src
+        run: |
+          make surge \
+            NAUTY=${{ github.workspace }}/nauty2_9_3 \
+            NAUTYLIB=${{ github.workspace }}/nauty2_9_3 \
+            CCOPT="-O3"
+
+      - name: Test surge
+        working-directory: src
+        run: |
+          ./surge -help 2>&1 | head -3
+          ./surge -u C6H6
+          ./surge -u C4H10
+
+      - name: Build canonsdf
+        working-directory: src
+        run: |
+          make canonsdf \
+            NAUTY=${{ github.workspace }}/nauty2_9_3 \
+            NAUTYLIB=${{ github.workspace }}/nauty2_9_3 \
+            CCOPT="-O3"
+
+      - name: Upload Linux binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: surge-linux-x86_64
+          path: src/surge
+
+  build-macos:
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+          - os: macos-15
+            arch: arm64-m15
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install nauty
+        run: brew install nauty
+
+      - name: Create nauty library symlink
+        run: |
+          NAUTY_LIB=$(brew --prefix nauty)/lib
+          ln -sf "$NAUTY_LIB/libnautyL1.a" "$NAUTY_LIB/nautyL1.a"
+
+      - name: Build surge
+        working-directory: src
+        run: |
+          make surge \
+            NAUTY=$(brew --prefix nauty)/include/nauty \
+            NAUTYLIB=$(brew --prefix nauty)/lib \
+            CCOPT="-O3"
+
+      - name: Test surge
+        working-directory: src
+        run: |
+          ./surge -help 2>&1 | head -3
+          ./surge -u C6H6
+          ./surge -u C4H10
+
+      - name: Upload macOS binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: surge-macos-${{ matrix.arch }}
+          path: src/surge
+
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            make
+            mingw-w64-ucrt-x86_64-zlib
+            curl
+            tar
+
+      - name: Build nauty
+        run: |
+          curl -L -o nauty2_9_3.tar.gz https://users.cecs.anu.edu.au/~bdm/nauty/nauty2_9_3.tar.gz
+          tar xzf nauty2_9_3.tar.gz
+          cd nauty2_9_3
+          ./configure && make
+
+      - name: Build surge
+        working-directory: src
+        run: |
+          make surge \
+            NAUTY=$(cygpath -u "$GITHUB_WORKSPACE")/nauty2_9_3 \
+            NAUTYLIB=$(cygpath -u "$GITHUB_WORKSPACE")/nauty2_9_3 \
+            CCOPT="-O3"
+
+      - name: Test surge
+        working-directory: src
+        run: |
+          ./surge.exe -help 2>&1 | head -3
+          ./surge.exe -u C6H6
+          ./surge.exe -u C4H10
+
+      - name: Upload Windows binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: surge-windows-x86_64
+          path: src/surge.exe

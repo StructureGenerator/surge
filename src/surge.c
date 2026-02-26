@@ -1,12 +1,17 @@
 /* This is a molecule generator based on geng.
-   Version 1.0, November 11, 2021.
+   Version 2.0, January 2026.
 
-   Unix-style compilation command would be:
+   Brendan McKay
+   Christoph Steinbeck
+
+   A typical Unix-style compilation command is:
 
      gcc -o surge -O3 -DWORDSIZE=32 -DMAXN=WORDSIZE -DOUTPROC=surgeproc \
-         -march=native -mtune=native -DPREPRUNE=surgepreprune \
+         -march=native -DPREPRUNE=surgepreprune \
          -DPRUNE=surgeprune -DGENG_MAIN=geng_main \
          surge.c geng.c planarity.c nautyW1.a
+
+   But use the makefile if you can.
 
    You can build-in gzip output using the zlib library (https://zlib.net).
    Add -DZLIB to the compilation, and link with the zlib library either
@@ -20,38 +25,55 @@
 
    There is a makefile in the package; edit the first few lines.
 
-   This version works best with geng version 3.2 or later. To use
+   This version works best with geng version 3.3 or later. To use
    with an earlier version, add -DOLDGENG to the compilation command.
+
+   Changes since version 1.0.
+
+   1.1: For SDfile output, a single output call is made for each molecule
+        rather than each line. This gives a small improvement in throughput.
+
+        Counting only (-u) is now the default.
+        To obtain SDfile output, use -F.
+
+   2.0: The new -R switch removes all but one molecule from each set of
+        Kekule structures equivalent under carbon-ring aromaticity.
+        See the manual for a precise definition.  The summary line now
+        shows the counts before and after the filtering.
+
+        -h# and -h#:# restrict the number of hexagons
+        -C# and -C#:# restrict the number of carbon 6-rings
 
 ***********************************************************************/
 
 #ifdef ZLIB
 #define USAGE \
-  "[-oFILE] [-z] [-u|-A|-S] [-T] [-e#|-e#:#] [-d#] [-c#] [-m#/#] formula"
+  "[-oFILE] [-z] [-A|-S|-F] [-T] [-e#|-e#:#] [-R] [-d#] [-c#] [-m#/#] formula"
 #else
 #define USAGE \
-  "[-oFILE] [-u|-A|-S] [-T] [-e#|-e#:#] [-d#] [-c#] [-m#/#] formula"
+  "[-oFILE] [-A|-S|-F] [-T] [-e#|-e#:#] [-R] [-d#] [-c#] [-m#/#] formula"
 #endif
 
 #define HELPUSECMD
 
 #define HELPTEXT1 \
-"Make chemical graphs from a formula. Version 1.0.\n" \
+"Make chemical graphs from a formula. Version 2.0.\n" \
 "  Known elements are C,B,N,P,O,S,H,Cl,F,Br,I at their lowest valences.\n" \
 "  Higher valences can be selected using Nx (Nitrogen/5), Sx,Sy (Sulfur 4/6)\n" \
 "   Px (Phosphorus/5).\n" \
 "\n" \
 "  formula = a formula like C8H6N2\n" \
 "\n" \
-"  -u    Just count, don't write\n" \
+"  -u    Just count, don't write molecules (default)\n" \
 "  -S    Output in SMILES format\n" \
+"  -F    Output in SDfile format\n" \
 "  -A    Output in alphabetical format\n" \
-"  -O#   Output stage: 1 after geng, 2 after vcolg, 3 after multig\n" \
-"        Default is to write SDfile format\n" \
-"  -e# -e#:#  Restrict to given range of distinct non-H bonds\n" \
-"  -t# -t#:#  Limit number of rings of length 3\n" \
-"  -f# -f#:#  Limit number of cycles of length 4\n" \
-"  -p# -p#:#  Limit number of cycles of length 5\n" \
+"  -e# -e#:#  Limit the number of distinct non-H bonds\n" \
+"  -t# -t#:#  Limit the number of cycles of length 3\n" \
+"  -f# -f#:#  Limit the number of cycles of length 4\n" \
+"  -p# -p#:#  Limit the number of cycles of length 5\n" \
+"  -h# -h#:#  Limit the number of cycles of length 6\n" \
+"  -C# -C#:#  Limit the number of chord-free cycles 6 carbon atoms\n" \
 "  -b    Only rings of even length (same as only cycles of even length)\n" \
 "  -T    Disallow triple bonds\n" \
 "  -P    Require planarity\n" \
@@ -72,6 +94,7 @@
 "     7 = no K_33 or K_24 structure\n" \
 "     8 = none of cone of P4 or K4 with 3-ear\n" \
 "     9 = no atom in more than one ring of length 3 or 4\n" \
+"  -R    Enable aromaticity detection (filters duplicate Kekule structures)\n" \
 "  -v     Write more information to stderr\n" \
 "  -m#/#  Do only a part. The two numbers are res/mod where 0<=res<mod.\n" \
 "  -oFILE Write the output to the given file rather than to stdout.\n" \
@@ -84,6 +107,7 @@
 /* Undocumented options:
   -G...  Anything to the end of the parameter is passed to geng
   -x     Used for development purposes; not useful for users
+  -O#    Level for output (1,2,3, default 3)
 */
 
 #define MAXN WORDSIZE    /* Not bigger than WORDSIZE, which can be 32 or 64 */
@@ -146,11 +170,13 @@ static boolean bad9;    /* No atom on two rings of length 3 or 4 */
 
 static boolean needcoordtest;
 
-static boolean needcycles;
-static int maxcycles=0;
-#define MAXCYCLES 200
-static setword inducedcycle[MAXCYCLES];
-static int cyclecount;
+static boolean needrings; /* List of induced cycles needed */
+static int maxrings=0,maxcycles=0;
+#define MAXCYCLES 300
+static setword inducedcycle[MAXCYCLES];  /* Only if needrings */
+static int ringcount;
+static setword sixring[MAXCYCLES];   /* Only if Cswitch */
+static int sixringcount;
 
 int GENG_MAIN(int argc, char *argv[]);  /* geng main() */
 static int min1,min12,max34,max4; /* bounds on degree counts on geng output */
@@ -158,6 +184,7 @@ static int min1,min12,max34,max4; /* bounds on degree counts on geng output */
 static counter gengout=0, genggood=0;
 static counter vcolgnontriv=0,vcolgout=0;
 static counter multignontriv=0,multigout=0;
+static counter molnum=0;
 static long maxvgroup,maxegroup;
 
 static boolean uswitch;  /* suppress output */
@@ -165,23 +192,39 @@ static boolean verbose;  /* print more information to stderr */
 static int outlevel;  /* 1 = geng only, 2 = geng+vcolg,
                        3 = geng+vcolg+multig, 4 = everything */
 static boolean smiles;  /* output in SMILES format */
+static boolean SDFoutput;  /* output in SDfile format */
 static int maxbond;  /* maximum mult -1 of bonds (1 if -t, else 2) */
 
 static boolean planar;  /* Molecules must be planar */
 static int maxcoord;  /* Maximum coordination number allowed */        //UNUSED
 static boolean xswitch;  /* Undocumented, used for development */
+static boolean Rswitch;  /* Enable aromaticity detection */
+
+static int carbonindex = -1;  /* Index of C */
+
+/* Pre-computed aromatic-size cycles
+ * (computed once per graph after geng if -R is given) */
+#define AROM_MAXCYCLES 1024
+static struct cycle { setword odd,even; } arom_cycles[AROM_MAXCYCLES];
+static int arom_cyclecount;
 
 /* In the following, the counts are only meaningful if the
    corresponding boolean is true. */
 static boolean tswitch;
-static long min3rings,max3rings;  /* number of rings of length 3 */
-static int count3ring[MAXN+1];
+static long min3cycles,max3cycles;  /* number of rings of length 3 */
+static int count3cyc[MAXN+1];
 static boolean fswitch;
-static long min4rings,max4rings;  /* number of rings of length 4 */
-static int count4ring[MAXN+1];
+static long min4cycles,max4cycles;  /* number of cycles of length 4 */
+static int count4cyc[MAXN+1];
 static boolean pswitch;
-static long min5rings,max5rings;  /* number of rings of length 5 */
-static int count5ring[MAXN+1];
+static long min5cycles,max5cycles;  /* number of cycles of length 5 */
+static int count5cyc[MAXN+1];
+static boolean hswitch;
+static long min6cycles,max6cycles;  /* number of cycles of length 6 */
+static int count6cyc[MAXN+1];
+static boolean Cswitch;
+static long minCrings,maxCrings;  /* Number of carbon 6-rings */
+
 static boolean bipartite;
 
 /* The following is only used if bad9 is selected */
@@ -414,8 +457,34 @@ program with WORDSIZE=64 if you really need to). */
 
 /******************************************************************/
 
-void dummy()
+void dummy(counter cnt)
 {
+    fprintf(stderr,">C %llu\n",cnt);
+}
+
+/******************************************************************/
+
+static void
+printset(FILE *f, setword w, int newline)
+/* Write the set to f with optional newline. */
+{
+    int i,first;
+
+    if (w == 0)
+        fprintf(f,"{}");
+    else
+    {
+        first = 1;
+        while (w)
+        {
+            TAKEBIT(i,w);
+            if (first) fprintf(f,"{%d",i);
+            else       fprintf(f,",%d",i);
+            first = 0;
+        }
+        fprintf(f,"}");
+    }
+    if (newline) fprintf(f,"\n");
 }
 
 /******************************************************************/
@@ -613,48 +682,50 @@ SMILESoutput(int *vcol, int n, int *hyd, int *mult, int ne)
     if (fputs(line,outfile) == EOF) gt_abort(">E surge : output error\n");
 }
 
+static char SDbuffer[70+70*MAXN+22*MAXNE];  /* Used for SDfile output */
+
 /******************************************************************/
 
 static void
 SDFformat(int *vcol, int n, int *hyd, int *mult, int ne)
 /* Write molecules in SDF format */
 {
-    int i,j;
-    
+    int i;
+    char *p;
+
+    p = SDbuffer;
+    sprintf(p,"\nSurge 2.0\n\n");
+    p += 12;
+    sprintf(p,"%3d%3d  0  0  0  0            999 V2000\n",n,ne);
+    p += 40;
+
+    for (i = 0; i < n; ++i)
+    {
+        sprintf(p,"    0.0000    0.0000    0.0000 %-2s"
+                  "  0  0  0  0  0%3d  0  0  0  0  0  0\n",
+             element[vcol[i]].name,element[vcol[i]].valence);
+        p += 70;
+    }
+
+    for (i = 0; i < ne; ++i)
+    {
+        sprintf(p,"%3d%3d%3d  0  0  0  0\n",
+                  edge[i].x+1,edge[i].y+1,mult[i]+1);
+        p += 22;
+    }
+
+    sprintf(p,"M  END\n$$$$\n");
+
 #ifdef ZLIB
     if (gzip)
     {
-        gzprintf(gzoutfile,"\nSurge 1.0\n\n");
-        gzprintf(gzoutfile,"%3d%3d  0  0  0  0            999 V2000\n",n,ne);
-
-        for (i = 0; i < n; ++i)
-            gzprintf(gzoutfile,"    0.0000    0.0000    0.0000 %-2s"
-                   "  0  0  0  0  0%3d  0  0  0  0  0  0\n",
-                   element[vcol[i]].name,element[vcol[i]].valence);
-    
-        for (i = 0; i < ne; ++i)
-            gzprintf(gzoutfile,"%3d%3d%3d  0  0  0  0\n",
-                edge[i].x+1,edge[i].y+1,mult[i]+1);
-
-        gzprintf(gzoutfile,"M  END\n$$$$\n");
+        gzwrite(gzoutfile,SDbuffer,64+70*n+22*ne);
 
         return;
     }
 #endif
 
-    fprintf(outfile,"\nSurge 1.0\n\n");
-    fprintf(outfile,"%3d%3d  0  0  0  0            999 V2000\n",n,ne);
-
-    for (i = 0; i < n; ++i)
-        fprintf(outfile,"    0.0000    0.0000    0.0000 %-2s"
-               "  0  0  0  0  0%3d  0  0  0  0  0  0\n",
-               element[vcol[i]].name,element[vcol[i]].valence);
-
-    for (i = 0; i < ne; ++i)
-        fprintf(outfile,"%3d%3d%3d  0  0  0  0\n",
-            edge[i].x+1,edge[i].y+1,mult[i]+1);
-
-    fprintf(outfile,"M  END\n$$$$\n");
+    fwrite(SDbuffer,1,64+70*n+22*ne,outfile);
 }
 
 /****************************************************************/
@@ -741,6 +812,196 @@ alphabeticoutput(int *vcol, int n, int *mult, int ne)
 }
 
 /******************************************************************/
+/* Aromaticity detection functions */
+
+static void
+pathscan(graph *g, int first, int start, setword body,
+                setword last, setword thiseven, setword thisodd)
+/* Paths in g starting at start, lying within body and
+   ending in last.  {start} and last should be disjoint subsets of body. */
+{
+    setword gs,w;
+    int i,nc,len;
+
+    gs = g[start];
+    w = gs & last;
+    nc = POPCOUNT(w);
+    len = POPCOUNT(thisodd|thiseven);
+    if (len % 4 == 0 && nc)
+    {
+        if (arom_cyclecount + nc > AROM_MAXCYCLES)
+            gt_abort(">E surge: increase AROM_MAXCYCLES\n");
+        while (w)
+        {
+            TAKEBIT(i,w);
+            arom_cycles[arom_cyclecount].even
+                        = thiseven | bit[edgenumber[first][i]];
+            arom_cycles[arom_cyclecount].odd
+                        = thisodd | bit[edgenumber[start][i]];
+            ++arom_cyclecount;
+        }
+    }
+
+    body &= ~bit[start];
+    w = gs & body;
+    while (w)
+    {
+        TAKEBIT(i,w);
+        if (len % 2 == 0)
+            pathscan(g,first,i,body,last&~bit[i],
+                thiseven,thisodd|bit[edgenumber[start][i]]);
+        else
+            pathscan(g,first,i,body,last&~bit[i],
+                thiseven|bit[edgenumber[start][i]],thisodd);
+    }
+}
+
+static void
+arom_find_cycles(graph *g, int n)
+{
+    setword body,nbhd;
+    int first,j,d;
+
+    arom_cyclecount = 0;
+
+    body = 0;
+    for (j = 0; j < n; ++j)
+    {
+        d = POPCOUNT(g[j]);
+        if (d > 1 && d < 4) body |= bit[j];
+    }
+
+    while (body)
+    {
+        TAKEBIT(first,body);
+        nbhd = g[first] & body;
+        while (nbhd)
+        {
+            TAKEBIT(j,nbhd);
+            pathscan(g,first,j,body,nbhd,0,bit[edgenumber[first][j]]);
+        }
+    }
+
+    if (arom_cyclecount > maxcycles) maxcycles = arom_cyclecount;
+}
+
+static boolean
+largermult(setword singles, setword doubles, int *mult, int ne)
+/* Return TRUE if an non-trivial edge group element takes this to
+ * something greater than mult[].  Otherwise return FALSE. */
+{
+    int newmult[MAXNE];
+    int i,j,*gp,res;
+    long kgp;
+
+    res = 0;
+    for (i = 0; i < ne; ++i)
+    {
+        if ((singles&bit[i]))      newmult[i] = 0;
+        else if ((doubles&bit[i])) newmult[i] = 1;
+        else                       newmult[i] = mult[i];
+    }
+
+ /* The identity is not stored, kgp starts at 1 below */
+    for (kgp = 1, gp = egroup; kgp < egroupsize; ++kgp, gp += ne)
+    {
+        for (i = 0; i < ne; ++i)
+        {
+            j = gp[i];
+            if      (newmult[j] > mult[i]) return TRUE;
+            else if (newmult[j] < mult[i]) break;
+        }
+    }
+    return FALSE;
+}
+
+/* Used by -R to list single C-C bonds for aromaticity test.
+   Bound on number of labelled molecules that can be obtained by
+   repeated rotation of aromatic cycles. */
+#define MAXAROMATES 512
+static setword singlelist[MAXAROMATES];
+static int arom_parent[MAXAROMATES];
+
+static boolean
+is_not_maximal(setword singles, setword doubles, int *mult, int ne)
+/* Return TRUE iff is not a maximal form. */
+{
+    setword allCC,sing,doub,newsing;
+    int ci,head,tail,i,par;
+
+    allCC = singles | doubles;  /* All CC bonds */
+
+  /* We use a queue to find everything reached by rotating aromatic
+   * cycles recursively. For each one, we test if it is minimal 
+   * under the edge group. */
+ 
+    tail = 0;
+    head = 1;
+    singlelist[0] = singles;
+    arom_parent[0] = -1;
+    while (tail < head)
+    {
+        par = arom_parent[tail];
+        sing = singlelist[tail++];
+        doub = allCC ^ sing;
+        for (ci = 0; ci < arom_cyclecount; ++ci)
+        if (ci != par)
+        {
+            if ((!(arom_cycles[ci].odd & ~sing)
+                                && !(arom_cycles[ci].even & ~doub))
+               || (!(arom_cycles[ci].odd & ~doub)
+                                && !(arom_cycles[ci].even & ~sing)))
+            {
+                /* Now this is an aromatic cycle */
+                if ((arom_cycles[ci].odd & ~sing))
+                    newsing = (sing | arom_cycles[ci].odd) & ~arom_cycles[ci].even;
+                else
+                    newsing = (sing | arom_cycles[ci].even) & ~arom_cycles[ci].odd;
+                for (i = 0; i < head; ++i)  /* Check if new */
+                    if (newsing == singlelist[i]) break;
+                if (i == head)
+                {
+                    if (newsing < singles) return TRUE;
+                    if (egroupsize > 1
+                        && largermult(newsing,allCC^newsing,mult,ne)) return TRUE;
+                    if (head == MAXAROMATES)
+                    {
+                        fprintf(stderr,">E surge: increase MAXAROMATES\n");
+                        exit(1);
+                    }
+                    arom_parent[head] = ci;
+                    singlelist[head++] = newsing;
+                }
+            }
+        }
+    }
+    
+    return FALSE;
+}
+
+static boolean
+arom_check_duplicate(int *vcol, int n, int *hyd, int *mult, int ne)
+/* Returns TRUE iff this molecule is a duplicate aromatic structure. */
+{
+    int ei;
+    setword singles,doubles;   /* C-C and C=C bonds */
+
+    singles = doubles = 0;
+
+    for (ei = 0; ei < ne; ++ei)
+    {
+        if (vcol[edge[ei].x] == carbonindex
+                        && vcol[edge[ei].y] == carbonindex)
+        {
+            if (mult[ei] == 0) singles |= bit[ei];
+            if (mult[ei] == 1) doubles |= bit[ei];
+        }
+    }
+
+    return is_not_maximal(singles,doubles,mult,ne);
+}
+
+/******************************************************************/
 
 static void
 gotone(int *vcol, int n, int *hyd, int *mult, int ne, int level)
@@ -749,7 +1010,7 @@ gotone(int *vcol, int n, int *hyd, int *mult, int ne, int level)
    hyd[0..n-1] is the number of implicit hydrogens
 */
 {
-    int i,val;
+    int i;
 
     for (i = level; i < ne; ++i) mult[i] = 0;
 
@@ -759,6 +1020,11 @@ gotone(int *vcol, int n, int *hyd, int *mult, int ne, int level)
             if (deg[i] + hyd[i] > element[vcol[i]].maxcoord) return;
             if (deg[i] + hyd[i] > 4 && hyd[i] > 0) return;
         }
+
+    ++molnum;
+
+    /* Check for duplicate aromatic structure if -R enabled */
+    if (Rswitch && arom_check_duplicate(vcol, n, hyd, mult, ne)) return; 
 
 #ifdef SURGEPLUGIN_STEP3
     SURGEPLUGIN_STEP3
@@ -938,6 +1204,8 @@ colouredges(graph *g, int *vcolindex, int n)
     int needed;  /* Extra edges needed */
     int iter[FORMULALEN];
     int vcol[MAXN];  /* index into element[] */
+    setword CCbonds;
+    int Cringcount;
 
     ne = numedges;
 
@@ -961,6 +1229,20 @@ colouredges(graph *g, int *vcolindex, int n)
     needed = (valencesum - hydrogens)/2 - ne;  /* Extra edges needed */
 
     if (ne == 0 && needed > 0) return;
+
+    if (Cswitch)
+    {
+        CCbonds = 0;
+        for (i = 0; i < ne; ++i)
+            if (vcol[edge[i].x] == carbonindex
+                        && vcol[edge[i].y] == carbonindex)
+                CCbonds |= bit[i];
+        Cringcount = 0;
+        for (i = 0; i < sixringcount; ++i)
+            if (!(sixring[i] & ~CCbonds)) ++Cringcount;
+        if (Cringcount < minCrings || Cringcount > maxCrings)
+            return;
+    }
 
     if (alphabetic)
     {
@@ -1350,18 +1632,18 @@ int
 surgeprune(graph *g, int n, int nmax)
 /* This is a procedure that geng will call at each level
 using the PRUNE service.
-The options -t, -f, -p, -B7,8 are implemented here by
+The options -t, -f, -p, -h, -B7,8 are implemented here by
 incrementally updating the required counts. */
 {
-    setword w,ax,ay,gx,gy,gxy,gxya,gi,gj;
+    setword w,ax,ay,gx,gxy,gxya,gi,gj,gn,gxn,gyn,bitxyn;
     int i,j,x,y,k,a,b,extra;
-    int i1,i2,i3,i4,d1,d2,d3,d4;
+    int i1,i2,i3,i4,d1,d2,d3,d4,xy,xn,yn,xyn;
     int v[MAXN];
 
     if (tswitch)
     {
         if (n <= 2)
-            count3ring[n] = 0;
+            count3cyc[n] = 0;
         else
         {
             extra = 0;
@@ -1371,17 +1653,17 @@ incrementally updating the required counts. */
                 TAKEBIT(i,w);
                 extra += POPCOUNT(g[i]&w);
             }
-            count3ring[n] = count3ring[n-1] + extra;
-            if (count3ring[n] > max3rings) return 1;
+            count3cyc[n] = count3cyc[n-1] + extra;
+            if (count3cyc[n] > max3cycles) return 1;
         }
-        if (n == nmax && count3ring[n] < min3rings)
+        if (n == nmax && count3cyc[n] < min3cycles)
             return 1;
     }
 
     if (fswitch)
     {
         if (n <= 3)
-            count4ring[n] = 0;
+            count4cyc[n] = 0;
         else
         {
             extra = 0;
@@ -1390,17 +1672,17 @@ incrementally updating the required counts. */
                 k = POPCOUNT(g[i]&g[n-1]);
                 extra += k*k - k;
             }
-            count4ring[n] = count4ring[n-1] + extra/2;
-            if (count4ring[n] > max4rings) return 1;
+            count4cyc[n] = count4cyc[n-1] + extra/2;
+            if (count4cyc[n] > max4cycles) return 1;
         }
-        if (n == nmax && count4ring[n] < min4rings)
+        if (n == nmax && count4cyc[n] < min4cycles)
             return 1;
     }
 
     if (pswitch)
     {
         if (n <= 4)
-            count5ring[n] = 0;
+            count5cyc[n] = 0;
         else
         {
             extra = 0;
@@ -1415,10 +1697,42 @@ incrementally updating the required counts. */
                     extra += POPCOUNT(ax)*POPCOUNT(ay) - POPCOUNT(ax&ay);
                 }
             }
-            count5ring[n] = count5ring[n-1] + extra;
-            if (count5ring[n] > max5rings) return 1;
+            count5cyc[n] = count5cyc[n-1] + extra;
+            if (count5cyc[n] > max5cycles) return 1;
         }
-        if (n == nmax && count5ring[n] < min5rings)
+        if (n == nmax && count5cyc[n] < min5cycles)
+            return 1;
+    }
+
+    if (hswitch)
+    {
+        if (n <= 4)
+            count6cyc[n] = 0;
+        else
+        {
+            extra = 0;
+            gn = g[n-1];
+            for (y = 1; y < n-1; ++y)
+            if ((g[y] & gn))
+            {
+                for (x = 0; x < y; ++x)
+                if ((g[x] & g[y]) && (g[x] & gn))
+                {
+                    bitxyn = bit[x] | bit[y] | bit[n-1];
+                    gxy = g[x] & g[y] & ~bitxyn;
+                    gxn = g[x] & gn & ~bitxyn;
+                    gyn = g[y] & gn & ~bitxyn;
+                    xy = POPCOUNT(gxy);
+                    xn = POPCOUNT(gxn);
+                    yn = POPCOUNT(gyn);
+                    xyn = POPCOUNT(gxy&gxn&gyn);
+                    extra += xy*xn*yn - xyn*(xy+xn+yn-2);
+                }
+            }
+            count6cyc[n] = count6cyc[n-1] + extra;
+            if (count6cyc[n] > max6cycles) return 1;
+        }
+        if (n == nmax && count6cyc[n] < min6cycles)
             return 1;
     }
 
@@ -1672,8 +1986,8 @@ makesmilesskeleton(graph *g, int n)
 static void
 inducedpaths(graph *g, int origin, int start, setword body,
                                         setword last, setword path)
-/* Number of induced paths in g starting at start, extravertices within
- * body and ending in last.
+/* Trace induced paths in g starting at start, extra vertices within
+ * body and ending in last. This is used to find induced cycles.
  * {start}, body and last should be disjoint. */
 {
     setword gs,w;
@@ -1685,7 +1999,8 @@ inducedpaths(graph *g, int origin, int start, setword body,
     while (w)
     {
         TAKEBIT(i,w);
-        inducedcycle[cyclecount++]
+        if (ringcount == MAXCYCLES) gt_abort(">E Increase MAXCYCLES\n");
+        inducedcycle[ringcount++]
            = path | bit[edgenumber[start][i]] | bit[edgenumber[origin][i]];
     }
 
@@ -1700,24 +2015,20 @@ inducedpaths(graph *g, int origin, int start, setword body,
 
 static void
 findinducedcycles(graph *g, int n)
-/* Find all the induced cycles */
+/* Find all the induced cycles (called rings in the manual) */
 {
     setword body,last,cni;
     int i,j;
 
-#if 0
     body = 0;
     for (i = 0; i < n; ++i)
         if (POPCOUNT(g[i]) > 1) body |= bit[i];
-#else
-    body = ALLMASK(n);
-#endif
 
-    cyclecount = 0;
+    ringcount = 0;
 
-    for (i = 0; i < n-2; ++i)
+    while (body)
     {
-        body &= ~bit[i];
+        TAKEBIT(i,body);
         last = g[i] & body;
         cni = g[i] | bit[i];
         while (last)
@@ -1725,29 +2036,41 @@ findinducedcycles(graph *g, int n)
             TAKEBIT(j,last);
             inducedpaths(g,i,j,body&~cni,last,bit[edgenumber[i][j]]);
         }
-        if (cyclecount > 3*MAXCYCLES/4) gt_abort(">E increase MAXCYCLES\n");
     }
 
-    if (cyclecount > maxcycles) maxcycles = cyclecount;
+    if (ringcount > maxrings) maxrings = ringcount;
 
-#if 0
-    printf("cyclecount=%d\n",cyclecount);
-
+    if (verbose)
     {
         setword cyc; int i,j;
-
-        for (i = 0; i < cyclecount; ++i)
+        fprintf(stderr, "SURGE rings (%d):", ringcount);
+        for (i = 0; i < ringcount; ++i)
         {
+            fprintf(stderr, " [");
             cyc = inducedcycle[i];
+            int first = 1;
             while (cyc)
             {
                 TAKEBIT(j,cyc);
-                printf(" %d-%d",edge[j].x,edge[j].y);
+                if (!first) fprintf(stderr, ",");
+                fprintf(stderr, "%d-%d", edge[j].x, edge[j].y);
+                first = 0;
             }
-            printf("\n");
+            fprintf(stderr, "](%d)", POPCOUNT(inducedcycle[i]));
         }
+        fprintf(stderr, "\n");
     }
-#endif
+}
+
+static void
+find6rings(void)
+{
+    int i;
+
+    sixringcount = 0;
+    for (i = 0; i < ringcount; ++i)
+        if (POPCOUNT(inducedcycle[i]) == 6)
+            sixring[sixringcount++] = inducedcycle[i];
 }
 
 /******************************************************************/
@@ -1778,7 +2101,7 @@ surgeproc(FILE *outfile, graph *gin, int n)
     if (n > 1 && (n1 < min1 || n12 < min12 || n34 > max34 || n4 > max4))
         return;
 
-    if (planar && !isplanar(gin,n)) return;    /* Try later */
+    if (planar && !isplanar(gin,n)) return;
 
     ++genggood;
 
@@ -1817,16 +2140,21 @@ surgeproc(FILE *outfile, graph *gin, int n)
     }
     numedges = ne;
 
-    if (needcycles)
-    {
+    if (ne > WORDSIZE && (needrings || Rswitch))
         if (ne > WORDSIZE)
-            gt_abort(">E surge : too many edges for badlists\n");
-        findinducedcycles(g,n);
+            gt_abort(">E surge : too many edges for badlists or -R\n");
+
+    if (needrings) findinducedcycles(g,n);
+    if (Cswitch)
+    {
+        find6rings();
+        if (sixringcount < minCrings) return;
     }
+    if (Rswitch) arom_find_cycles(g,n);
 
     if (bad1)  /* no triple bonds in rings smaller than 7 */
     {
-        for (i = 0; i < cyclecount; ++i)
+        for (i = 0; i < ringcount; ++i)
         {
             cyc = inducedcycle[i];
             if (POPCOUNT(cyc) <= 7)
@@ -1840,11 +2168,11 @@ surgeproc(FILE *outfile, graph *gin, int n)
 
     if (bad2)  /* Bredt's rule for one common bond */
     {
-        for (i = 0; i < cyclecount-1; ++i)
+        for (i = 0; i < ringcount-1; ++i)
         {
             isize = POPCOUNT(inducedcycle[i]);
             if (isize > 6) continue;
-            for (j = i+1; j < cyclecount; ++j)
+            for (j = i+1; j < ringcount; ++j)
             {
                 jsize = POPCOUNT(inducedcycle[j]);
                 if (jsize > 6) continue;
@@ -1871,12 +2199,12 @@ surgeproc(FILE *outfile, graph *gin, int n)
 
     if (bad3)  /* Bredt's rule for two common bonds */
     {
-        for (i = 0; i < cyclecount-1; ++i)
+        for (i = 0; i < ringcount-1; ++i)
         {
             isize = POPCOUNT(inducedcycle[i]);
             if (isize == 3 || isize > 6) continue;
 
-            for (j = i+1; j < cyclecount; ++j)
+            for (j = i+1; j < ringcount; ++j)
             {
                 jsize = POPCOUNT(inducedcycle[j]);
                 if (jsize == 3 || jsize > 6 || isize+jsize == 12) continue;
@@ -1902,12 +2230,12 @@ surgeproc(FILE *outfile, graph *gin, int n)
 
     if (bad4) /* Bredt's rule for two hexagons with 3 bonds in common */
     {
-        for (i = 0; i < cyclecount-1; ++i)
+        for (i = 0; i < ringcount-1; ++i)
         {
             isize = POPCOUNT(inducedcycle[i]);
             if (isize != 6) continue;
 
-            for (j = i+1; j < cyclecount; ++j)
+            for (j = i+1; j < ringcount; ++j)
             {
                 jsize = POPCOUNT(inducedcycle[j]);
                 if (jsize != 6) continue;
@@ -1956,7 +2284,7 @@ surgeproc(FILE *outfile, graph *gin, int n)
     if (bad6)  /* No A=A=A in rings up to length 8 */
     {                           
         cycle8 = 0; 
-        for (i = 0; i < cyclecount; ++i)
+        for (i = 0; i < ringcount; ++i)
             if (POPCOUNT(inducedcycle[i]) <= 8) cycle8 |= inducedcycle[i];
 
         for (i = 0; i < n; ++i)
@@ -2006,7 +2334,7 @@ decode_formula(char *formula, int *nv,
 */
 {
     int i,j,d,mult,val,cnt,totval,dbe,forced;
-    int maxvcoord,localmine,localmaxe,localmaxd,xi,yi;
+    int maxvcoord,localmine,localmaxe,xi,yi;
     char *s1,*s2,*p;
     int count[FORMULALEN];
 
@@ -2201,13 +2529,13 @@ start_geng(int n, int maxd, int maxc,
     geng_argv[1] = arga;
     geng_argc = 2;
 
-    if (tswitch && max3rings == 0)
+    if (tswitch && max3cycles == 0)
     {
         geng_argv[geng_argc++] = "-t";
         tswitch = FALSE;
     }
 
-    if (fswitch && max4rings == 0)
+    if (fswitch && max4cycles == 0)
     {
         geng_argv[geng_argc++] = "-f";
         fswitch = FALSE;
@@ -2245,14 +2573,14 @@ start_geng(int n, int maxd, int maxc,
 static void
 processEswitch(char **ps, char *id)
 /* Process -E starting at *ps = the character after E, and update *ps.
-   The value has the form <inputname>[,<name>]<valence>[<maxcoord>],
+   The value has the form <inputname>[<name>]<valence>[<maxcoord>],
    where <inputname> and <name> are either <upper> or <upper><lower> and
    <valence> and <maxcoord> are single digits. Inputname comes first. */
 {
     char inputname[3],name[3];
     int valence,maxcoord;
     char *s;
-    int state,err;
+    int state;
 
     s = *ps;
     state = 0;
@@ -2347,7 +2675,7 @@ main(int argc, char *argv[])
     long eminval,emaxval;
     double t1,t2;
     long badlist[BADLISTS];
-    int badlen;
+    int badlen,outf;
 
     HELP;
 
@@ -2370,7 +2698,7 @@ main(int argc, char *argv[])
     oswitch = gzip = alphabetic = Bswitch = FALSE;
     tswitch = fswitch = pswitch = bipartite = FALSE;
     cswitch = planar = xswitch = Dswitch = FALSE;
-    Oswitch = FALSE; outlevel = 4;
+    Oswitch = Cswitch = FALSE; outlevel = 4;
     extra1 = extra2 = formula = NULL;
     bad1 = bad2 = bad3 = bad4 = bad5 = bad6 = bad7 = bad8 = bad9 = FALSE;
 
@@ -2407,16 +2735,20 @@ main(int argc, char *argv[])
                 else SWBOOLEAN('v',verbose)
                 else SWBOOLEAN('T',notriples)
                 else SWBOOLEAN('S',smiles)
+                else SWBOOLEAN('F',SDFoutput)
                 else SWBOOLEAN('z',gzip)
                 else SWBOOLEAN('A',alphabetic)
                 else SWBOOLEAN('b',bipartite)
                 else SWBOOLEAN('P',planar)
+                else SWBOOLEAN('R',Rswitch)
                 else SWBOOLEAN('x',xswitch)
                 else SWSEQUENCEMIN('B',",",Bswitch,badlist,1,BADLISTS,badlen,"surge -B")
                 else SWRANGE('e',":-",eswitch,eminval,emaxval,"surge -e")
-                else SWRANGE('t',":-",tswitch,min3rings,max3rings,"surge -t")
-                else SWRANGE('f',":-",fswitch,min4rings,max4rings,"surge -f")
-                else SWRANGE('p',":-",pswitch,min5rings,max5rings,"surge -p")
+                else SWRANGE('t',":-",tswitch,min3cycles,max3cycles,"surge -t")
+                else SWRANGE('f',":-",fswitch,min4cycles,max4cycles,"surge -f")
+                else SWRANGE('p',":-",pswitch,min5cycles,max5cycles,"surge -p")
+                else SWRANGE('h',":-",hswitch,min6cycles,max6cycles,"surge -h")
+                else SWRANGE('C',":-",Cswitch,minCrings,maxCrings,"surge -C")
                 else SWELEMENT('E',"surge -E")
 #ifdef SURGEPLUGIN_SWITCHES
                 else SURGEPLUGIN_SWITCHES
@@ -2470,26 +2802,31 @@ main(int argc, char *argv[])
         gt_abort(">E surge : -z is only allowed if zlib is compiled in\n");
 #endif
 
-    if (uswitch) gzip = oswitch = alphabetic = FALSE;
+    outf = (alphabetic==TRUE) + (smiles==TRUE)
+           + (SDFoutput==TRUE) + (uswitch==TRUE);
 
-    if (alphabetic && smiles)
-        gt_abort(">E surge : -A and -S are incompatible\n");
+    if (outf > 1)
+        gt_abort(">E surge : -A,-S,-F,-u are incompatible\n");
+    if (outf == 0 && !Oswitch) uswitch = TRUE;
+
+    if (uswitch) gzip = FALSE;
 
     if (!oswitch || (oswitch && strcmp(outfilename,"-") == 0))
         outfilename = "stdout";
 
     if (bad5) bad6 = FALSE;        /* bad6 is a subset of bad5 */
     if (notriples) bad1 = FALSE;
-    if (tswitch && fswitch && max3rings+max4rings <= 1)
+    if (tswitch && fswitch && max3cycles+max4cycles <= 1)
         bad9 = FALSE;
 
-    needcycles = (bad1 || bad2 || bad3 || bad4 || bad6); 
+    needrings = (bad1 || bad2 || bad3 || bad4 || bad6 || Cswitch); 
 
-    if (fswitch && max4rings < 6) bad7 = FALSE;
+    if (fswitch && max4cycles < 6) bad7 = FALSE;
 
-    if (tswitch && max3rings < 3) bad8 = FALSE;
-    if (fswitch && max4rings < 2) bad8 = FALSE;
-    if (pswitch && max5rings == 0) bad8 = FALSE;
+    if (tswitch && max3cycles < 3) bad8 = FALSE;
+    if (fswitch && max4cycles < 2) bad8 = FALSE;
+    if (pswitch && max5cycles == 0) bad8 = FALSE;
+    if (hswitch && max6cycles < 3) bad4 = FALSE;
 
     if (gzip)
     {
@@ -2547,6 +2884,7 @@ main(int argc, char *argv[])
         maxe = NOLIMIT;
     }
 
+    carbonindex = elementindex("C");
     decode_formula(formula,&nv,&mine,&maxe,&maxd,&maxc);
 
     t1 = CPUTIME;
@@ -2573,15 +2911,21 @@ main(int argc, char *argv[])
               " %ld, made %lld graphs\n",multignontriv,maxegroup,multigout);
     }
 
-    if (needcycles) fprintf(stderr,"Max cycles = %d\n",maxcycles);
+    if (needrings) fprintf(stderr,"Max rings = %d\n",maxrings);
+    if (Rswitch) fprintf(stderr,"Max 2 mod 4 cycles = %d\n",maxcycles);
 
 #ifdef SURGEPLUGIN_SUMMARY
     SURGEPLUGIN_SUMMARY
 #endif
 
-    fprintf(stderr,">Z %s %llu -> %llu -> %llu in %.2f sec\n",
-        (uswitch ? "generated" : "wrote"),
-        gengout,vcolgout,multigout,t2-t1);
+    if (Rswitch)
+        fprintf(stderr,">Z %s %llu -> %llu -> %llu -> %llu in %.2f sec\n",
+            (uswitch ? "generated" : "wrote"),
+            gengout,vcolgout,molnum,multigout,t2-t1);
+    else
+        fprintf(stderr,">Z %s %llu -> %llu -> %llu in %.2f sec\n",
+            (uswitch ? "generated" : "wrote"),
+            gengout,vcolgout,multigout,t2-t1);
 
     return 0;
 }
