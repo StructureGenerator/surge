@@ -1,6 +1,6 @@
 FROM alpine:3.21 AS builder
 
-RUN apk add --no-cache build-base curl zlib-dev
+RUN apk add --no-cache build-base curl zlib-dev zlib-static
 
 WORKDIR /build
 
