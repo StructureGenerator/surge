@@ -72,7 +72,7 @@ Make chemical graphs from a formula. Version 2.0.
 ```
 ## Installation
 ### Option 1: Binary releases
-Download one of the [releases](https://github.com/StructureGenerator/SURGE/releases) and run it.
+Download one of the [releases](https://github.com/StructureGenerator/SURGE/releases) and run it. Pre-built binaries are available for Linux (x86_64), macOS (Apple Silicon), and Windows (x86_64). On Intel Macs, the Apple Silicon binary runs transparently via Rosetta 2, or you can build from source (see below).
 
 ### Option 2: Build from source code
 1. Download the latest Nauty release from https://users.cecs.anu.edu.au/~bdm/nauty/ and build it following the instructions on the page.
