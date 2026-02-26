@@ -39,6 +39,37 @@ jobs:
           ./surge -u C6H6
           ./surge -u C4H10
 
+      - name: Cross-platform verification tests
+        working-directory: src
+        run: |
+          {
+            echo "=== surge -u C6H6 ==="
+            ./surge -u C6H6 2>&1
+            echo "=== surge -u C4H10 ==="
+            ./surge -u C4H10 2>&1
+            echo "=== surge -u C3H8 ==="
+            ./surge -u C3H8 2>&1
+            echo "=== surge -u C7H8 ==="
+            ./surge -u C7H8 2>&1
+            echo "=== surge -u C2H6O ==="
+            ./surge -u C2H6O 2>&1
+            echo "=== surge -u C10H16O ==="
+            ./surge -u C10H16O 2>&1
+            echo "=== surge -S C4H10 ==="
+            ./surge -S C4H10 | sort
+            echo "=== surge -S C2H6O ==="
+            ./surge -S C2H6O | sort
+            echo "=== surge -u -R C10H8 ==="
+            ./surge -u -R C10H8 2>&1
+          } > ../test-results.txt
+          cat ../test-results.txt
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-linux-x86_64
+          path: test-results.txt
+
       - name: Build canonsdf
         working-directory: src
         run: |
@@ -88,6 +119,37 @@ jobs:
           ./surge -u C6H6
           ./surge -u C4H10
 
+      - name: Cross-platform verification tests
+        working-directory: src
+        run: |
+          {
+            echo "=== surge -u C6H6 ==="
+            ./surge -u C6H6 2>&1
+            echo "=== surge -u C4H10 ==="
+            ./surge -u C4H10 2>&1
+            echo "=== surge -u C3H8 ==="
+            ./surge -u C3H8 2>&1
+            echo "=== surge -u C7H8 ==="
+            ./surge -u C7H8 2>&1
+            echo "=== surge -u C2H6O ==="
+            ./surge -u C2H6O 2>&1
+            echo "=== surge -u C10H16O ==="
+            ./surge -u C10H16O 2>&1
+            echo "=== surge -S C4H10 ==="
+            ./surge -S C4H10 | sort
+            echo "=== surge -S C2H6O ==="
+            ./surge -S C2H6O | sort
+            echo "=== surge -u -R C10H8 ==="
+            ./surge -u -R C10H8 2>&1
+          } > ../test-results.txt
+          cat ../test-results.txt
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-macos-${{ matrix.arch }}
+          path: test-results.txt
+
       - name: Upload macOS binary
         uses: actions/upload-artifact@v4
         with:
@@ -134,8 +196,85 @@ jobs:
           ./surge.exe -u C6H6
           ./surge.exe -u C4H10
 
+      - name: Cross-platform verification tests
+        working-directory: src
+        run: |
+          {
+            echo "=== surge -u C6H6 ==="
+            ./surge.exe -u C6H6 2>&1
+            echo "=== surge -u C4H10 ==="
+            ./surge.exe -u C4H10 2>&1
+            echo "=== surge -u C3H8 ==="
+            ./surge.exe -u C3H8 2>&1
+            echo "=== surge -u C7H8 ==="
+            ./surge.exe -u C7H8 2>&1
+            echo "=== surge -u C2H6O ==="
+            ./surge.exe -u C2H6O 2>&1
+            echo "=== surge -u C10H16O ==="
+            ./surge.exe -u C10H16O 2>&1
+            echo "=== surge -S C4H10 ==="
+            ./surge.exe -S C4H10 | sort
+            echo "=== surge -S C2H6O ==="
+            ./surge.exe -S C2H6O | sort
+            echo "=== surge -u -R C10H8 ==="
+            ./surge.exe -u -R C10H8 2>&1
+          } > ../test-results.txt
+          cat ../test-results.txt
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-windows-x86_64
+          path: test-results.txt
+
       - name: Upload Windows binary
         uses: actions/upload-artifact@v4
         with:
           name: surge-windows-x86_64
           path: src/surge.exe
+
+  verify-consistency:
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all test results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-results-*
+          path: results
+
+      - name: Compare results across platforms
+        run: |
+          echo "=== Downloaded test results ==="
+          ls -la results/*/test-results.txt
+
+          # Use Linux as the reference
+          reference="results/test-results-linux-x86_64/test-results.txt"
+          echo ""
+          echo "=== Reference results (Linux x86_64) ==="
+          cat "$reference"
+
+          failed=0
+          for result in results/*/test-results.txt; do
+            platform=$(basename $(dirname "$result"))
+            if [ "$result" = "$reference" ]; then
+              continue
+            fi
+            echo ""
+            echo "=== Comparing $platform against reference ==="
+            if diff -u "$reference" "$result"; then
+              echo "PASS: $platform matches reference"
+            else
+              echo "FAIL: $platform differs from reference!"
+              failed=1
+            fi
+          done
+
+          if [ $failed -eq 1 ]; then
+            echo ""
+            echo "FAILURE: Cross-platform results are inconsistent!"
+            exit 1
+          else
+            echo ""
+            echo "SUCCESS: All platforms produce identical results"
+          fi
