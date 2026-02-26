@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata from this file."
+type: software
+title: "Surge: a fast open-source chemical graph generator"
+version: 2.0.0
+date-released: 2026-02-26
+license: Apache-2.0
+repository-code: "https://github.com/StructureGenerator/surge"
+authors:
+  - family-names: McKay
+    given-names: Brendan D.
+    orcid: "https://orcid.org/0000-0002-3553-0496"
+    affiliation: "Australian National University"
+  - family-names: Yirik
+    given-names: Mehmet Aziz
+    orcid: "https://orcid.org/0000-0001-7520-7215"
+  - family-names: Steinbeck
+    given-names: Christoph
+    orcid: "https://orcid.org/0000-0001-6966-0814"
+    affiliation: "Friedrich Schiller University Jena"
+preferred-citation:
+  type: article
+  title: "Surge: a fast open-source chemical graph generator"
+  authors:
+    - family-names: McKay
+      given-names: Brendan D.
+      orcid: "https://orcid.org/0000-0002-3553-0496"
+    - family-names: Yirik
+      given-names: Mehmet Aziz
+      orcid: "https://orcid.org/0000-0001-7520-7215"
+    - family-names: Steinbeck
+      given-names: Christoph
+      orcid: "https://orcid.org/0000-0001-6966-0814"
+  journal: "Journal of Cheminformatics"
+  volume: 14
+  issue: 1
+  article-number: 24
+  year: 2022
+  month: 4
+  doi: "10.1186/s13321-022-00604-9"
+  issn: "1758-2946"
