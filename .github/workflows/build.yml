@@ -249,10 +249,16 @@ jobs:
           pattern: test-results-*
           path: results
 
-      - name: Compare results across platforms
+      - name: Normalize and compare results across platforms
         run: |
           echo "=== Downloaded test results ==="
           ls -la results/*/test-results.txt
+
+          # Normalize all results: strip \r, remove timing info
+          for f in results/*/test-results.txt; do
+            sed -i 's/\r$//' "$f"
+            sed -i 's/ in [0-9]*\.[0-9]* sec/ in X sec/g' "$f"
+          done
 
           # Use Linux as the reference
           reference="results/test-results-linux-x86_64/test-results.txt"
