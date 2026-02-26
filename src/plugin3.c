@@ -4,11 +4,9 @@
 #define HELPTEXT2 \
 " This version counts the hydrogen atoms attached to carbon atoms.\n"
 
-static int carbonindex = -1;   /* index into element table */
-static long long CHcount[5*MAXN+1];
+static long long CHcount[5*MAXN+1]={0};
 
 #define SURGEPLUGIN_STEP3 \
- if (carbonindex < 0) carbonindex = elementindex("C"); \
  { int ii,CHval; CHval=0; for (ii = 0; ii < n; ++ii) \
       if (vcol[ii] == carbonindex) CHval += hyd[ii]; \
    ++CHcount[CHval]; } 
