@@ -13,9 +13,6 @@ jobs:
           - os: ubuntu-latest
             artifact: surge-linux-x86_64
             binary: surge
-          - os: macos-13
-            artifact: surge-macos-x86_64
-            binary: surge
           - os: macos-14
             artifact: surge-macos-arm64
             binary: surge
@@ -133,7 +130,6 @@ jobs:
 
             ### Binaries
             - `surge-linux-x86_64.tar.gz` - Linux (x86_64)
-            - `surge-macos-x86_64.tar.gz` - macOS (Intel)
             - `surge-macos-arm64.tar.gz` - macOS (Apple Silicon)
             - `surge-windows-x86_64.tar.gz` - Windows (x86_64, built with MSYS2)
           files: |

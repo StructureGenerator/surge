@@ -57,10 +57,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-13
-            arch: x86_64
           - os: macos-14
             arch: arm64
+          - os: macos-15
+            arch: arm64-m15
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
