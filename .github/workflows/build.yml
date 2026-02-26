@@ -290,3 +290,19 @@ jobs:
             echo ""
             echo "SUCCESS: All platforms produce identical results"
           fi
+
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t surge:test .
+
+      - name: Test Docker image
+        run: |
+          docker run --rm surge:test -u C6H6
+          docker run --rm surge:test -S C3H8
+
+      - name: Check image size
+        run: docker images surge:test --format "{{.Size}}"
