@@ -52,7 +52,7 @@ canonsdf : canonsdf.c
 	${CC} -o canonsdf -I${NAUTY} ${CCOPT} canonsdf.c ${NAUTYLIB}/nautyL1.a
 
 clean :
-	rm -rf surge surge_0 surge_1 surge_2 surge_3 canonsdf
+	rm -rf surge surge_0 surge_1 surge_2 surge_3 canonsdf *.dSYM
 
 tarfile :
 	rm -rf surge${VERSION}
