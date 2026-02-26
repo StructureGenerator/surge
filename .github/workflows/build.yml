@@ -59,6 +59,8 @@ jobs:
             ./surge -S C4H10 | sort
             echo "=== surge -S C2H6O ==="
             ./surge -S C2H6O | sort
+            echo "=== surge -u C7H12O2N2 ==="
+            ./surge -u C7H12O2N2 2>&1
             echo "=== surge -u -R C10H8 ==="
             ./surge -u -R C10H8 2>&1
           } > ../test-results.txt
@@ -139,6 +141,8 @@ jobs:
             ./surge -S C4H10 | sort
             echo "=== surge -S C2H6O ==="
             ./surge -S C2H6O | sort
+            echo "=== surge -u C7H12O2N2 ==="
+            ./surge -u C7H12O2N2 2>&1
             echo "=== surge -u -R C10H8 ==="
             ./surge -u -R C10H8 2>&1
           } > ../test-results.txt
@@ -216,6 +220,8 @@ jobs:
             ./surge.exe -S C4H10 | sort
             echo "=== surge -S C2H6O ==="
             ./surge.exe -S C2H6O | sort
+            echo "=== surge -u C7H12O2N2 ==="
+            ./surge -u C7H12O2N2 2>&1
             echo "=== surge -u -R C10H8 ==="
             ./surge.exe -u -R C10H8 2>&1
           } > ../test-results.txt
