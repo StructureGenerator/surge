@@ -95,11 +95,11 @@
 "     8 = none of cone of P4 or K4 with 3-ear\n" \
 "     9 = no atom in more than one ring of length 3 or 4\n" \
 "  -R    Enable aromaticity detection (filters duplicate Kekule structures)\n" \
-"  -v     Write more information to stderr\n" \
-"  -m#/#  Do only a part. The two numbers are res/mod where 0<=res<mod.\n" \
+"  -v    Write more information to stderr\n" \
+"  -m#/# Do only a part. The two numbers are res/mod where 0<=res<mod.\n" \
 "  -oFILE Write the output to the given file rather than to stdout.\n" \
 "  -E..  Define a new element (see the manual)\n" \
-"  -z     Write output in gzip format (only if compiled with zlib)\n"
+"  -z    Write output in gzip format (only if compiled with zlib)\n"
 
 #define EXTRAUSAGE ""
 #define HELPTEXT2 ""

@@ -60,11 +60,11 @@ Make chemical graphs from a formula. Version 2.0.
      8 = none of cone of P4 or K4 with 3-ear
      9 = no atom in more than one ring of length 3 or 4
   -R    Enable aromaticity detection (filters duplicate Kekule structures)
-  -v     Write more information to stderr
-  -m#/#  Do only a part. The two numbers are res/mod where 0<=res<mod.
+  -v    Write more information to stderr
+  -m#/# Do only a part. The two numbers are res/mod where 0<=res<mod.
   -oFILE Write the output to the given file rather than to stdout.
   -E..  Define a new element (see the manual)
-  -z     Write output in gzip format (only if compiled with zlib)
+  -z    Write output in gzip format (only if compiled with zlib)
 ```
 ## Installation
 ### Option 1: Binary releases
