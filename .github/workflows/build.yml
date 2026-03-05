@@ -191,7 +191,7 @@ jobs:
           make surge \
             NAUTY=$(cygpath -u "$GITHUB_WORKSPACE")/nauty2_9_3 \
             NAUTYLIB=$(cygpath -u "$GITHUB_WORKSPACE")/nauty2_9_3 \
-            CCOPT="-O3"
+            CCOPT="-O3 -static"
 
       - name: Test surge
         working-directory: src
